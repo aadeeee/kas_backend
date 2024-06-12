@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
-import config from './authjwt.js';
 import User from '../model/user.js';
+
 
  const verifyToken = (req, res, next) => {
   let token = req.headers["x-access-token"];
@@ -9,7 +9,7 @@ import User from '../model/user.js';
     return res.status(403).send({ message: "No token provided!" });
   }
 
-  jwt.verify(token, config.secret, (err, decoded) => {
+  jwt.verify(token, process.env.SECRET, (err, decoded) => {
     if (err) {
       return res.status(401).send({ message: "Unauthorized!" });
     }
@@ -31,6 +31,15 @@ import User from '../model/user.js';
     } catch (err) {
       res.status(500).send({ message: err.message });
     }
+  };
+
+  const hashPassword = async (userPassword) => {
+    const saltRound = 10;
+    return await bcrypt.hash(userPassword, saltRound);
+  };
+  
+  const comparePassword = async (password, hashedPassword) => {
+    return await bcrypt.compare(password, hashedPassword);
   };
   
 export default {verifyToken, checkDuplicateEmail}
