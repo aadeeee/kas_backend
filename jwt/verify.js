@@ -1,8 +1,7 @@
-import jwt from 'jsonwebtoken';
-import User from '../model/user.js';
+import jwt from "jsonwebtoken";
+import User from "../model/user.js";
 
-
- const verifyToken = (req, res, next) => {
+const verifyToken = (req, res, next) => {
   let token = req.headers["x-access-token"];
 
   if (!token) {
@@ -17,29 +16,24 @@ import User from '../model/user.js';
     next();
   });
 };
- const checkDuplicateEmail = async (req, res, next) => {
-    try {
-      const user = await User.findOne({
-        email: req.body.email,
-      });
-  
-      if (user) {
-        return res.status(400).send({ message: 'Failed! Email is already in use!' });
-      }
-  
-      next();
-    } catch (err) {
-      res.status(500).send({ message: err.message });
-    }
-  };
+const checkDuplicateEmail = async (req, res, next) => {
+  try {
+    const user = await User.findOne({
+      email: req.body.email,
+    });
 
-  const hashPassword = async (userPassword) => {
-    const saltRound = 10;
-    return await bcrypt.hash(userPassword, saltRound);
-  };
-  
-  const comparePassword = async (password, hashedPassword) => {
-    return await bcrypt.compare(password, hashedPassword);
-  };
-  
-export default {verifyToken, checkDuplicateEmail}
+    if (user) {
+      return res
+        .status(400)
+        .send({ message: "Failed! Email is already in use!" });
+    }
+
+    next();
+  } catch (err) {
+    res.status(500).send({ message: err.message });
+  }
+};
+
+
+
+export default { verifyToken, checkDuplicateEmail };

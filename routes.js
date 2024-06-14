@@ -9,163 +9,151 @@ import nodemailer from "nodemailer";
 
 const router = express.Router();
 
-// add user
-// User.insertMany([
-//   {
-//     email: "name@gmail.com",
-//     password: "12345678",
-//   },
-// ]);
 
 //Transaction
+
 // (POST)
-router.post("/transaksi", async (req, res) => {
+router.post("/transaction", auth.verifyToken, async (req, res) => {
+  const transaction = new Transaction({
+    ...req.body,
+    userId: req.userId,
+  });
   try {
-    const { price, nama, date, note, status } = req.body;
-
-    const transaction = new Transaction({
-      price,
-      nama,
-      date,
-      note,
-      status,
-    });
-
     await transaction.save();
-
-    res.status(201).json({ message: "Transaction created successfully!" });
+    res.status(201).send(transaction);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    res.status(400).send(error);
   }
 });
 
 // (GET)
-router.get("/transaksi", async (req, res) => {
+router.get("/transaction", auth.verifyToken, async (req, res) => {
   try {
-    const transactions = await Transaction.find();
-    res.status(200).json(transactions);
+    const transactions = await Transaction.find({ userId: req.userId });
+    res.send(transactions);
   } catch (error) {
-    res.status(404).json({ message: error.message });
+    res.status(500).send(error);
   }
 });
 
 // by ID (GET)
-router.get("/transaksi/:id", async (req, res) => {
+router.get("/transaction/:id", auth.verifyToken, async (req, res) => {
   try {
-    const transaction = await Transaction.findById(req.params.id);
+    const transaction = await Transaction.findOne({
+      _id: req.params.id,
+      userId: req.userId,
+    });
     if (!transaction) {
-      return res.status(404).json({ message: "Transaction not found" });
+      return res.status(404).send({ message: "Transaction not found" });
     }
-    res.status(200).json(transaction);
+    res.send(transaction);
   } catch (error) {
-    res.status(404).json({ message: error.message });
+    res.status(500).send(error);
   }
 });
 
 //  (PUT)
-router.put("/transaksi/:id", async (req, res) => {
+router.put("/transaction/:id", auth.verifyToken, async (req, res) => {
   try {
-    const { price, nama, date, note, status } = req.body;
-
-    const updatedTransaction = await Transaction.findByIdAndUpdate(
-      req.params.id,
-      {
-        price,
-        nama,
-        date,
-        note,
-        status,
-      },
-      { new: true }
+    const transaction = await Transaction.findOneAndUpdate(
+      { _id: req.params.id, userId: req.userId },
+      req.body,
+      { new: true, runValidators: true }
     );
-
-    res.status(200).json({
-      message: "Transaction updated successfully!",
-      updatedTransaction,
-    });
+    if (!transaction) {
+      return res.status(404).send({ message: "Transaction not found" });
+    }
+    res.send(transaction);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    res.status(400).send(error);
   }
 });
 
 // Delete (DELETE)
-router.delete("/transaksi/:id", async (req, res) => {
+router.delete("/transaction/:id", auth.verifyToken, async (req, res) => {
   try {
-    const deletedTransaction = await Transaction.findByIdAndDelete(
-      req.params.id
-    );
-    if (!deletedTransaction) {
-      return res.status(404).json({ message: "Transaction not found" });
-    }
-    res.status(200).json({
-      message: "Transaction deleted successfully!",
-      deletedTransaction,
+    const transaction = await Transaction.findOneAndDelete({
+      _id: req.params.id,
+      userId: req.userId,
     });
+    if (!transaction) {
+      return res.status(404).send({ message: "Transaction not found" });
+    }
+    res.send({ message: "Transaction deleted successfully" });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    res.status(500).send(error);
   }
 });
 
 //Students
 
 // Add Student
-router.post("/students", async (req, res) => {
-  const { name, phoneNumber } = req.body;
+router.post("/students", auth.verifyToken, async (req, res) => {
+  const student = new Student({
+    ...req.body,
+    userId: req.userId,
+  });
   try {
-    const newStudent = new Student({ name, phoneNumber });
-    await newStudent.save();
-    res
-      .status(201)
-      .json({ message: "Student added successfully!", newStudent });
+    await student.save();
+    res.status(201).send(student);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(400).send(error);
   }
 });
 
 // Get All Students
-router.get("/students", async (req, res) => {
+router.get("/students", auth.verifyToken, async (req, res) => {
   try {
-    const students = await Student.find();
-    res.status(200).json(students);
+    const students = await Student.find({ userId: req.userId });
+    res.send(students);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).send(error);
   }
 });
 
+router.get("/students/:id", auth.verifyToken, async (req, res) => {
+  try {
+    const student = await Student.findOne({
+      _id: req.params.id,
+      userId: req.userId,
+    });
+    if (!student) {
+      return res.status(404).send({ message: "Student not found" });
+    }
+    res.send(student);
+  } catch (error) {
+    res.status(500).send(error);
+  }
+});
 // Delete Student by ID
-router.delete("/students/:id", async (req, res) => {
-  const { id } = req.params;
+router.delete("/students/:id", auth.verifyToken, async (req, res) => {
   try {
-    const deletedStudent = await Student.findByIdAndDelete(id);
-    if (!deletedStudent) {
-      return res.status(404).json({ message: "Student not found" });
+    const student = await Student.findOneAndDelete({
+      _id: req.params.id,
+      userId: req.userId,
+    });
+    if (!student) {
+      return res.status(404).send({ message: "Student not found" });
     }
-    res
-      .status(200)
-      .json({ message: "Student deleted successfully!", deletedStudent });
+    res.send({ message: "Student deleted successfully" });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).send(error);
   }
 });
-
 // Update Student by ID
-router.put("/students/:id", async (req, res) => {
-  const { id } = req.params;
-  const { name, phoneNumber } = req.body;
+router.put("/students/:id", auth.verifyToken, async (req, res) => {
   try {
-    const updatedStudent = await Student.findByIdAndUpdate(
-      id,
-      { name, phoneNumber },
-      { new: true }
+    const student = await Student.findOneAndUpdate(
+      { _id: req.params.id, userId: req.userId },
+      req.body,
+      { new: true, runValidators: true }
     );
-    if (!updatedStudent) {
-      return res.status(404).json({ message: "Student not found" });
+    if (!student) {
+      return res.status(404).send({ message: "Student not found" });
     }
-    res
-      .status(200)
-      .json({ message: "Student updated successfully!", updatedStudent });
+    res.send(student);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(400).send(error);
   }
 });
 
@@ -225,7 +213,7 @@ router.post("/login", async (req, res) => {
       },
       process.env.SECRET,
       {
-        expiresIn: 86400, // 24 hours
+        expiresIn: "24h", 
       }
     );
 
@@ -256,20 +244,19 @@ router.post("/forgot-password", async (req, res) => {
         .send({ message: "User not found, please register" });
     }
 
-    const token = jwt.sign({ email }, process.env.SECRET, { expiresIn: "1h" });
+    const token = jwt.sign({ email }, process.env.SECRET, { expiresIn: "300s" });
 
     const transporter = nodemailer.createTransport({
       service: "gmail",
-      secure: true,
       auth: {
         user: process.env.EMAIL,
         pass: process.env.EMAIL_PASSWORD,
       },
     });
 
-    const resetLink = `http://localhost:8000/reset-password/${token}`;
+    const resetLink = `https://kas-backend.vercel.app/reset-password/${token}`;
     const receiver = {
-      from: "dhearmtk@gmail.com",
+      from: process.env.EMAIL,
       to: email,
       subject: "Password Reset Request",
       html: `<p>Password reset successfully. Click the link below to reset your password:</p>
@@ -283,28 +270,110 @@ router.post("/forgot-password", async (req, res) => {
       accesstoken: token,
     });
   } catch (error) {
+    console.error("Error sending email:", error);
     return res.status(500).send({ message: "Something went wrong" });
   }
 });
+
+// GET reset password form
 router.get("/reset-password/:token", (req, res) => {
   const { token } = req.params;
 
   if (!token) {
     return res.status(400).send("Invalid or missing token");
   }
+
   res.send(`
-    <form action="/reset-password/${token}" method="POST">
-      <input type="hidden" name="token" value="${token}" />
-      <label for="email">Email:</label>
-      <input type="email" name="email" id="email" required />
-      <label for="password">New Password:</label>
-      <input type="password" name="password" id="password" required />
-      <button type="submit">Reset Password</button>
-    </form>
+    <html>
+    <head>
+      <title>Reset Password</title>
+      <style>
+    body {
+      background-color: #000; 
+      color: #fff; 
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center; 
+      align-items: center;
+      height: 100vh; 
+    }
+
+    .container {
+      text-align: center; 
+      padding: 20px; 
+      background-color: #333; 
+      border-radius: 8px; 
+      width: 300px; 
+    }
+
+    input[type="email"],
+    input[type="password"],
+    button[type="submit"] {
+      width: 100%; 
+      padding: 10px; 
+      margin-bottom: 10px; 
+      border: none; 
+      border-radius: 4px; 
+      font-size: 16px; 
+    }
+
+    button[type="submit"] {
+      background-color: #4CAF50; 
+      color: white;
+      cursor: pointer; 
+    }
+
+    button[type="submit"]:hover {
+      background-color: #45a049; 
+    }
+  </style>
+      <script>
+        const resetPassword = async () => {
+          const token = "${token}";
+          const email = document.getElementById('email').value;
+          const password = document.getElementById('password').value;
+
+          try {
+            const response = await fetch(\`/reset-password/\${token}\`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ email, password }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+              alert('Password reset successfully');
+              document.getElementById('email').value = '';
+              document.getElementById('password').value = '';
+             
+            } else {
+              alert(\`Failed to reset password: \${data.message}\`);
+            }
+          } catch (error) {
+            console.error('Error resetting password:', error);
+            alert('Failed to reset password. Please try again later.');
+          }
+        };
+      </script>
+    </head>
+    <body>
+      <form onsubmit="event.preventDefault(); resetPassword();">
+        <input type="hidden" name="token" value="${token}" />
+        <label for="email">Email:</label>
+        <input type="email" name="email" id="email" required /><br /><br />
+        <label for="password">New Password:</label>
+        <input type="password" name="password" id="password" required /><br /><br />
+        <button type="submit">Reset Password</button>
+      </form>
+    </body>
+    </html>
   `);
 });
 
-// Reset Password
+// POST reset password
 router.post("/reset-password/:token", async (req, res) => {
   try {
     const { token } = req.params;
@@ -335,6 +404,7 @@ router.post("/reset-password/:token", async (req, res) => {
 
     return res.status(200).send({ message: "Password reset successfully" });
   } catch (error) {
+    console.error("Error resetting password:", error);
     return res.status(500).send({ message: "Something went wrong" });
   }
 });
