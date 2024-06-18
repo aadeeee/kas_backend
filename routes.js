@@ -11,7 +11,6 @@ const router = express.Router();
 
 
 //Transaction
-
 // (POST)
 router.post("/transaction", auth.verifyToken, async (req, res) => {
   const transaction = new Transaction({
@@ -110,6 +109,18 @@ router.get("/students", auth.verifyToken, async (req, res) => {
     res.status(500).send(error);
   }
 });
+
+router.get("/students-name", auth.verifyToken, async (req, res) => {
+  try {
+    const students = await Student.find({ userId: req.userId }).select('name');
+    const studentNames = students.map(student => student.name);
+    res.send(studentNames);
+  } catch (error) {
+    res.status(500).send(error);
+  }
+});
+
+
 
 router.get("/students/:id", auth.verifyToken, async (req, res) => {
   try {
@@ -345,12 +356,12 @@ router.get("/reset-password/:token", (req, res) => {
             const data = await response.json();
 
             if (response.ok) {
-              alert('Password reset successfully');
+              alert('Kata sandi berhasil diganti, silahkan login kembali');
               document.getElementById('email').value = '';
               document.getElementById('password').value = '';
              
             } else {
-              alert(\`Failed to reset password: \${data.message}\`);
+              alert(\`Gagal mengganti kata sandi: \${data.message}\`);
             }
           } catch (error) {
             console.error('Error resetting password:', error);
