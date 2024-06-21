@@ -26,6 +26,59 @@ router.post("/transaction", auth.verifyToken, async (req, res) => {
 });
 
 // (GET)
+
+router.get("/transactions-invoice", auth.verifyToken, async (req, res) => {
+  const userId = req.userId;
+  const result = [];
+
+  const currentDate = new Date();
+  const currentMonth = currentDate.getMonth();
+  const currentYear = currentDate.getFullYear();
+
+  try {
+    for (let i = 0; i < 12; i++) {
+      const month = (currentMonth + i) % 12;
+      const year = currentYear + Math.floor((currentMonth + i) / 12);
+
+      const startDate = new Date(year, month, 1);
+      const endDate = new Date(year, month + 1, 0); 
+
+      const transactions = await Transaction.find({
+        userId: userId,
+        date: {
+          $gte: startDate,
+          $lte: endDate
+        }
+      });
+
+      const income = transactions
+        .filter(t => t.type === 'income')
+        .reduce((sum, t) => sum + t.price, 0);
+
+      const expense = transactions
+        .filter(t => t.type === 'expense')
+        .reduce((sum, t) => sum + t.price, 0);
+
+      const saldoAkhir = income - expense;
+
+      result.push({
+        month: month + 1,
+        year: year,
+        transactions: transactions,
+        totalIncome: income,
+        totalExpense: expense,
+        saldoAkhir
+      });
+    }
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send(error);
+  }
+});
+
+
+
 router.get("/transaction", auth.verifyToken, async (req, res) => {
   try {
     const transactions = await Transaction.find({ userId: req.userId });
@@ -34,6 +87,7 @@ router.get("/transaction", auth.verifyToken, async (req, res) => {
     res.status(500).send(error);
   }
 });
+
 
 // by ID (GET)
 router.get("/transaction/:id", auth.verifyToken, async (req, res) => {
