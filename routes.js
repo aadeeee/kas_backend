@@ -166,14 +166,16 @@ router.get("/students", auth.verifyToken, async (req, res) => {
 
 router.get("/students-name", auth.verifyToken, async (req, res) => {
   try {
-    const students = await Student.find({ userId: req.userId }).select('name');
-    const studentNames = students.map(student => student.name);
-    res.send(studentNames);
+    const students = await Student.find({ userId: req.userId }).select('name _id');
+    const studentNamesAndIds = students.map(student => ({
+      id: student._id,
+      name: student.name
+    }));
+    res.send(studentNamesAndIds);
   } catch (error) {
     res.status(500).send(error);
   }
 });
-
 
 
 router.get("/students/:id", auth.verifyToken, async (req, res) => {
@@ -190,6 +192,7 @@ router.get("/students/:id", auth.verifyToken, async (req, res) => {
     res.status(500).send(error);
   }
 });
+
 // Delete Student by ID
 router.delete("/students/:id", auth.verifyToken, async (req, res) => {
   try {
