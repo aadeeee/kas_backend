@@ -8,8 +8,6 @@ import auth from "./jwt/verify.js";
 import nodemailer from "nodemailer";
 
 const router = express.Router();
-
-
 //Transaction
 // (POST)
 router.post("/transaction", auth.verifyToken, async (req, res) => {
@@ -41,22 +39,22 @@ router.get("/transactions-invoice", auth.verifyToken, async (req, res) => {
       const year = currentYear + Math.floor((currentMonth + i) / 12);
 
       const startDate = new Date(year, month, 1);
-      const endDate = new Date(year, month + 1, 0); 
+      const endDate = new Date(year, month + 1, 0);
 
       const transactions = await Transaction.find({
         userId: userId,
         date: {
           $gte: startDate,
-          $lte: endDate
-        }
+          $lte: endDate,
+        },
       });
 
       const income = transactions
-        .filter(t => t.type === 'income')
+        .filter((t) => t.type === "income")
         .reduce((sum, t) => sum + t.price, 0);
 
       const expense = transactions
-        .filter(t => t.type === 'expense')
+        .filter((t) => t.type === "expense")
         .reduce((sum, t) => sum + t.price, 0);
 
       const saldoAkhir = income - expense;
@@ -67,7 +65,7 @@ router.get("/transactions-invoice", auth.verifyToken, async (req, res) => {
         transactions: transactions,
         totalIncome: income,
         totalExpense: expense,
-        saldoAkhir
+        saldoAkhir,
       });
     }
 
@@ -76,8 +74,6 @@ router.get("/transactions-invoice", auth.verifyToken, async (req, res) => {
     res.status(500).send(error);
   }
 });
-
-
 
 router.get("/transaction", auth.verifyToken, async (req, res) => {
   try {
@@ -88,22 +84,87 @@ router.get("/transaction", auth.verifyToken, async (req, res) => {
   }
 });
 
-
-// by ID (GET)
-router.get("/transaction/:id", auth.verifyToken, async (req, res) => {
+router.get("/transactions/yearly", auth.verifyToken, async (req, res) => {
   try {
-    const transaction = await Transaction.findOne({
-      _id: req.params.id,
-      userId: req.userId,
+    const userId = req.userId;
+    const transactions = await Transaction.find({ userId });
+    const students = await Student.find({ userId });
+
+    const studentIds = students.map((student) => student._id);
+    const transactionsByMonth = {};
+
+    const currentMonthIndex = new Date().getMonth();
+    const allMonthsInYear = getAllMonthsInYear(currentMonthIndex);
+
+    allMonthsInYear.forEach(monthKey => {
+      transactionsByMonth[monthKey] = [];
     });
-    if (!transaction) {
-      return res.status(404).send({ message: "Transaction not found" });
-    }
-    res.send(transaction);
+
+    transactions.forEach(transaction => {
+      const monthKey = getMonthName(transaction.date.getMonth());
+      transactionsByMonth[monthKey].push({
+        nama: transaction.nama || "",
+        id: transaction._id || "",
+        price: transaction.price || 0,
+        date: transaction.date || null,
+        note: transaction.note || "",
+        status: transaction.status || false,
+        type: transaction.type || "income",
+      });
+    });
+
+    allMonthsInYear.forEach(async (monthKey, index) => {
+      const monthIndex = currentMonthIndex + index;
+      for (const student of students) {
+        const existingTransaction = transactionsByMonth[monthKey].find(trans => trans.nama === student.name);
+        if (!existingTransaction) {
+          const newTransaction = new Transaction({
+            nama: student.name,
+            userId: userId,
+            price: 0,
+            date: new Date(new Date().getFullYear(), monthIndex, 1),
+            note: "",
+            status: false,
+            type: "income",
+            studentId: student._id
+          });
+          await newTransaction.save();
+          transactionsByMonth[monthKey].push({
+            nama: student.name,
+            id: newTransaction._id,
+            price: 0,
+            date: newTransaction.date,
+            note: "",
+            status: false,
+            type: "income",
+          });
+        }
+      }
+    });
+
+    res.status(200).send(transactionsByMonth);
   } catch (error) {
     res.status(500).send(error);
   }
 });
+
+
+function getMonthName(monthIndex) {
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  return monthNames[monthIndex];
+}
+
+function getAllMonthsInYear(startMonthIndex) {
+  const allMonthsInYear = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  return allMonthsInYear.slice(startMonthIndex).concat(allMonthsInYear.slice(0, startMonthIndex));
+}
+
 
 //  (PUT)
 router.put("/transaction/:id", auth.verifyToken, async (req, res) => {
@@ -166,28 +227,14 @@ router.get("/students", auth.verifyToken, async (req, res) => {
 
 router.get("/students-name", auth.verifyToken, async (req, res) => {
   try {
-    const students = await Student.find({ userId: req.userId }).select('name _id');
-    const studentNamesAndIds = students.map(student => ({
+    const students = await Student.find({ userId: req.userId }).select(
+      "name _id"
+    );
+    const studentNamesAndIds = students.map((student) => ({
       id: student._id,
-      name: student.name
+      name: student.name,
     }));
     res.send(studentNamesAndIds);
-  } catch (error) {
-    res.status(500).send(error);
-  }
-});
-
-
-router.get("/students/:id", auth.verifyToken, async (req, res) => {
-  try {
-    const student = await Student.findOne({
-      _id: req.params.id,
-      userId: req.userId,
-    });
-    if (!student) {
-      return res.status(404).send({ message: "Student not found" });
-    }
-    res.send(student);
   } catch (error) {
     res.status(500).send(error);
   }
@@ -281,7 +328,7 @@ router.post("/login", async (req, res) => {
       },
       process.env.SECRET,
       {
-        expiresIn: "24h", 
+        expiresIn: "24h",
       }
     );
 
@@ -294,7 +341,6 @@ router.post("/login", async (req, res) => {
     res.status(500).send({ message: err.message });
   }
 });
-
 
 router.post("/forgot-password", async (req, res) => {
   try {
@@ -312,7 +358,9 @@ router.post("/forgot-password", async (req, res) => {
         .send({ message: "User not found, please register" });
     }
 
-    const token = jwt.sign({ email }, process.env.SECRET, { expiresIn: "300s" });
+    const token = jwt.sign({ email }, process.env.SECRET, {
+      expiresIn: "300s",
+    });
 
     const transporter = nodemailer.createTransport({
       service: "gmail",
