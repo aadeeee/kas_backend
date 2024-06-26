@@ -6,6 +6,10 @@ import Transaction from "./model/transaction.js";
 import Student from "./model/students.js";
 import auth from "./jwt/verify.js";
 import nodemailer from "nodemailer";
+import moment from 'moment-timezone';
+import Nominal from './model/nominal.js'
+
+const jakartaTime = moment.tz(moment(), 'Asia/Jakarta');
 
 const router = express.Router();
 //Transaction
@@ -90,44 +94,87 @@ router.get("/transactions/yearly", auth.verifyToken, async (req, res) => {
     const transactions = await Transaction.find({ userId });
     const students = await Student.find({ userId });
 
-    const studentIds = students.map((student) => student._id);
     const transactionsByMonth = {};
 
-    const currentMonthIndex = new Date().getMonth();
+    const currentDate = new Date();
+    const currentMonthIndex = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+
+    function getMonthName(index) {
+      const monthNames = [
+        'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+      ];
+      return monthNames[index];
+    }
+
+    function getAllMonthsInYear(currentMonthIndex) {
+      const monthNames = [
+        'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+      ];
+      return [
+        ...monthNames.slice(currentMonthIndex),
+        ...monthNames.slice(0, currentMonthIndex)
+      ];
+    }
+
     const allMonthsInYear = getAllMonthsInYear(currentMonthIndex);
 
-    allMonthsInYear.forEach(monthKey => {
+    allMonthsInYear.forEach((monthKey) => {
       transactionsByMonth[monthKey] = [];
     });
 
-    transactions.forEach(transaction => {
-      const monthKey = getMonthName(transaction.date.getMonth());
-      transactionsByMonth[monthKey].push({
-        nama: transaction.nama || "",
-        id: transaction._id || "",
-        price: transaction.price || 0,
-        date: transaction.date || null,
-        note: transaction.note || "",
-        status: transaction.status || false,
-        type: transaction.type || "income",
-      });
+    transactions.forEach((transaction) => {
+      const transactionMonth = transaction.date.getMonth();
+      const monthKey = getMonthName(transactionMonth);
+      const student = students.find(
+        (student) => student.name === transaction.nama
+      );
+      if (student) {
+        const existingTransaction = transactionsByMonth[monthKey].find(
+          (trans) => trans.nama === student.name
+        );
+
+        if (!existingTransaction) {
+          transactionsByMonth[monthKey].push({
+            nama: transaction.nama || "",
+            id: transaction._id || "",
+            price: transaction.price || 0,
+            date: transaction.date || null,
+            note: transaction.note || "",
+            status: transaction.status || false,
+            type: transaction.type || "income",
+            phoneNumber: student.phoneNumber || "",
+          });
+        }
+      }
     });
 
-    allMonthsInYear.forEach(async (monthKey, index) => {
-      const monthIndex = currentMonthIndex + index;
+
+    let currentMonth = currentMonthIndex;
+    let currentYearIterator = currentYear;
+
+    for (let i = 0; i < 12; i++) {
+      const monthKey = getMonthName(currentMonth);
+      const lastDayOfMonth = new Date(currentYearIterator, currentMonth + 1, 0); 
+    
       for (const student of students) {
-        const existingTransaction = transactionsByMonth[monthKey].find(trans => trans.nama === student.name);
+        const existingTransaction = transactionsByMonth[monthKey].find(
+          (trans) => trans.nama === student.name
+        );
+    
         if (!existingTransaction) {
           const newTransaction = new Transaction({
             nama: student.name,
             userId: userId,
             price: 0,
-            date: new Date(new Date().getFullYear(), monthIndex, 1),
+            date: lastDayOfMonth,
             note: "",
             status: false,
             type: "income",
-            studentId: student._id
           });
+    
           await newTransaction.save();
           transactionsByMonth[monthKey].push({
             nama: student.name,
@@ -137,11 +184,18 @@ router.get("/transactions/yearly", auth.verifyToken, async (req, res) => {
             note: "",
             status: false,
             type: "income",
+            phoneNumber: student.phoneNumber,
           });
         }
       }
-    });
-
+    
+      currentMonth++;
+      if (currentMonth > 11) {
+        currentMonth = 0;
+        currentYearIterator++;
+      }
+    }
+    
     res.status(200).send(transactionsByMonth);
   } catch (error) {
     res.status(500).send(error);
@@ -149,21 +203,6 @@ router.get("/transactions/yearly", auth.verifyToken, async (req, res) => {
 });
 
 
-function getMonthName(monthIndex) {
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-  return monthNames[monthIndex];
-}
-
-function getAllMonthsInYear(startMonthIndex) {
-  const allMonthsInYear = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-  return allMonthsInYear.slice(startMonthIndex).concat(allMonthsInYear.slice(0, startMonthIndex));
-}
 
 
 //  (PUT)
@@ -194,6 +233,21 @@ router.delete("/transaction/:id", auth.verifyToken, async (req, res) => {
       return res.status(404).send({ message: "Transaction not found" });
     }
     res.send({ message: "Transaction deleted successfully" });
+  } catch (error) {
+    res.status(500).send(error);
+  }
+});
+
+router.delete("/transactions", auth.verifyToken, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const result = await Transaction.deleteMany({ userId });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).send({ message: "No transactions found for the user" });
+    }
+
+    res.send({ message: "All transactions deleted successfully" });
   } catch (error) {
     res.status(500).send(error);
   }
@@ -564,5 +618,47 @@ router.post("/change-password", async (req, res) => {
     return res.status(500).send({ message: "Something went wrong" });
   }
 });
+
+
+
+// GET Nominal
+router.get("/nominal", auth.verifyToken, async (req, res) => {
+  try {
+    const nominal = await Nominal.find({ userId: req.userId });
+    res.send(nominal);
+  } catch (error) {
+    res.status(500).send(error);
+  }
+});
+router.post("/nominal", auth.verifyToken, async (req, res) => {
+  const nominal = Nominal({
+    ...req.body,
+    userId: req.userId,
+  });
+  try {
+    await nominal.save();
+    res.status(201).send(nominal);
+  } catch (error) {
+    res.status(400).send(error);
+  }
+});
+
+router.put("/nominal/:id", auth.verifyToken, async (req, res) => {
+  try {
+    const nominal = await Nominal.findOneAndUpdate(
+      { _id: req.params.id, userId: req.userId },
+      req.body,
+      { new: true, runValidators: true }
+    );
+    if (!nominal) {
+      return res.status(404).send({ message: "Nominal not create yet" });
+    }
+    res.send(nominal);
+  } catch (error) {
+    res.status(400).send(error);
+  }
+});
+
+
 
 export default router;
