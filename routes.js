@@ -424,7 +424,7 @@ router.post("/forgot-password", async (req, res) => {
       },
     });
 
-    const resetLink = `https://kas-backend.vercel.app/reset-password/${token}`;
+    const resetLink = `https://kas-backend-dheas-projects-b0f8a020.vercel.app/${token}`;
     const receiver = {
       from: process.env.EMAIL,
       to: email,
